@@ -129,6 +129,7 @@ func (g *micro) generateService(file *generator.FileDescriptor, service *pb.Serv
 	g.P("type ", unexport(servName), "Client struct {")
 	g.P("c ", clientPkg, ".Client")
 	g.P("serviceName string")
+	g.P("packageName string")
 	g.P("}")
 	g.P()
 
@@ -140,9 +141,11 @@ func (g *micro) generateService(file *generator.FileDescriptor, service *pb.Serv
 	g.P("if len(serviceName) == 0 {")
 	g.P(`serviceName = "`, serviceName, `"`)
 	g.P("}")
+	g.P(`packageName := "`, serviceName, `"`)
 	g.P("return &", unexport(servName), "Client{")
 	g.P("c: c,")
 	g.P("serviceName: serviceName,")
+	g.P("packageName: packageName,")
 	g.P("}")
 	g.P("}")
 	g.P()
@@ -224,6 +227,10 @@ func (g *micro) generateClientMethod(reqServ, servName, serviceDescVar string, m
 	if !method.GetServerStreaming() && !method.GetClientStreaming() {
 		g.P(`req := c.c.NewRequest(c.serviceName, "`, reqMethod, `", in)`)
 		g.P("out := new(", outType, ")")
+		g.P("pkgotp := ", `func(opts *client.CallOptions) {`)
+		g.P(`opts.PackageName = "`, reqServ, `"`)
+		g.P("}")
+		g.P("opts = append(opts, pkgotp)")
 		// TODO: Pass descExpr to Invoke.
 		g.P("err := ", `c.c.Call(ctx, req, out, opts...)`)
 		g.P("if err != nil { return nil, err }")
@@ -234,6 +241,10 @@ func (g *micro) generateClientMethod(reqServ, servName, serviceDescVar string, m
 	}
 	streamType := unexport(servName) + methName + "Client"
 	g.P(`req := c.c.NewRequest(c.serviceName, "`, reqMethod, `", &`, inType, `{})`)
+	g.P("pkgotp := ", `func(opts *client.CallOptions) {`)
+	g.P(`opts.PackageName = "`, reqServ, `"`)
+	g.P("}")
+	g.P("opts = append(opts, pkgotp)")
 	g.P("stream, err := c.c.Stream(ctx, req, opts...)")
 	g.P("if err != nil { return nil, err }")
 
